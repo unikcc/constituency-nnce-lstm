@@ -326,9 +326,12 @@ class Preprocessor:
         for document, source_label, source_pos in tqdm(zip(documents, source_labels, part_of_speeches), total=len(documents)):
             sentence_ids, sentence_lengths, sentence_segments, sentence_labels, sentence_poses = [], [], [], [], []
             for sentence, s_label, pos in zip(document, source_label, source_pos):
-
                 tokens = sentence
+                for i in range(len(s_label)):
+                    print(tokens[i], s_label[i], end=',')
+                print()
                 input_pos = pos
+                assert len(tokens) == len(s_label)
                 input_pos = [self.pos_dict[w if w in self.pos_dict else '[UNK]'] for w in input_pos]
                 input_id = [self.word_dict[w] for w in tokens]
 

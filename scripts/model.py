@@ -8,6 +8,7 @@ from utils import get_f1_by_bio_nomask
 from utils import get_mention_f1
 from getCluster import get_cluster
 from utils import evaluate_coref
+from scripts.utils import refind_entity
 from metrics_back import CorefEvaluator
 
 #from pytorch_pretrained_bert.modeling import BertModel, BertPreTrainedModel
@@ -25,6 +26,7 @@ class myLSTM(nn.Module):
         self.output_size = config.num_labels
         self.dropout = nn.Dropout(0.2)
         #self.pos_lstm = nn.LSTM()
+        self.word_dict = config.word_dict
 
         hidden_size = self.hidden_size
         output_size = self.output_size + 1
@@ -333,22 +335,27 @@ class myLSTM(nn.Module):
         res = torch.stack(res, 0).to(self.device)
         return res
 
-    def get_dense_mention(self, output : torch.Tensor, sentence_counts, input_lengths, input_labels):
+    def get_dense_mention(self, output : torch.Tensor, sentence_counts, input_lengths, input_labels, input_ids):
         input_res, label_res = [], []
         cumulative, current_sent_id = -1, 0
         cur_input, cur_label = [], []
+        input_id_res = []
+        cur_id = []
 
         for i in range(output.shape[0]):
             length = input_lengths[i]
             line = output[i][:length]
             cur_input.append(line)
             cur_label.append(input_labels[i][:length])
+            cur_id.append(input_ids[i][:length])
             if i == sentence_counts[current_sent_id] + cumulative or i == output.shape[0] - 1:
                 cumulative += sentence_counts[current_sent_id]
                 current_sent_id += 1
                 input_res.append(torch.cat(cur_input, 0))
                 label_res.append(torch.cat(cur_label, 0))
+                input_id_res.append(torch.cat(cur_id, 0))
                 cur_input, cur_label = [], []
+                cur_id = []
         document_lengths = sentence_counts.new_zeros(sentence_counts.shape[0])
         for i, w in enumerate(input_res):
             document_lengths[i] = w.shape[0]
@@ -358,15 +365,16 @@ class myLSTM(nn.Module):
 
         dense_mask = sentence_counts.new_zeros([document_lengths.shape[0], max_lengths])
         batch_label = output.new_zeros([sentence_counts.shape[0], max_lengths])
+        batch_idx = sentence_counts.new_zeros([document_lengths.shape[0], max_lengths])
         for i, w in enumerate(input_res):
             batch_input[i][:w.shape[0]] = w
             batch_label[i][:w.shape[0]] = label_res[i]
             dense_mask[i][:w.shape[0]] = 1
+            batch_idx[i][:w.shape[0]] = input_id_res[i]
 
         dense_mask = dense_mask.reshape(-1,)
+        return batch_input, batch_label.long(), document_lengths, dense_mask, batch_idx
 
-
-        return batch_input, batch_label.long(), document_lengths, dense_mask
 
     def flatten_batch_output(self, input, input_lengths):
         input = [w for line in input for w in line]
@@ -383,12 +391,13 @@ class myLSTM(nn.Module):
         output, _ = nn.utils.rnn.pad_packed_sequence(output, batch_first=True)
 
         output = output[reverse_sort]
+        input_ids = input_ids[reverse_sort]
         input_lengths = input_lengths[reverse_sort]
 
         output = self.dropout(output)
         criterion = nn.CrossEntropyLoss(reduction='none')
         output = self.linear_1(output)
-        dense_input, dense_labels, document_lengths, dense_mask = self.get_dense_mention(output, sentence_counts, input_lengths, input_labels)
+        dense_input, dense_labels, document_lengths, dense_mask, batch_idx = self.get_dense_mention(output, sentence_counts, input_lengths, input_labels, input_ids)
 
         predict_output = self.mention_linear_no_pos(dense_input)
         t = dense_labels.reshape(-1, )
@@ -436,7 +445,9 @@ class myLSTM(nn.Module):
 
         #predict_output = self.flatten_batch_output(predict_output, document_lengths)
         #dense_labels = self.flatten_batch_output(dense_labels, document_lengths)
-        return losses, correct_counts, total_count, predict_output, dense_labels
+        #refind_entity(batch_idx, dense_labels, self.word_dict)
+
+        return losses, correct_counts, total_count, predict_output, dense_labels, document_lengths
         tmp_prf = coref_evaluator.get_prf()
 
         self.cluster = (pred_cluster, gold_cluster)

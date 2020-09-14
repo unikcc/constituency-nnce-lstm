@@ -82,15 +82,14 @@ class Pipeline:
             mention_sets = data['mention_sets']
 
             if training:
-                loss, correct_count, count, bio_p, bio_g  = self.model(input_ids, input_lengths, input_labels, mention_sets, sentence_counts, reverse_sort, False, coref_evaluator)
+                loss, correct_count, count, bio_p, bio_g, doc_len = self.model(input_ids, input_lengths, input_labels, mention_sets, sentence_counts, reverse_sort, False, coref_evaluator)
                 loss.backward()
                 nn.utils.clip_grad_norm(self.model.parameters(), self.max_grad_norm)
-                self.scheduler.step()
                 self.optimizer.step()
                 self.model.zero_grad()
             else:
                 with torch.no_grad():
-                    loss, correct_count, count, bio_p, bio_g = self.model(input_ids, input_lengths, input_labels,
+                    loss, correct_count, count, bio_p, bio_g, doc_len = self.model(input_ids, input_lengths, input_labels,
                                                                           mention_sets, sentence_counts, reverse_sort,
                                                                           False, coref_evaluator)
             bio_predict.append(bio_p)
@@ -99,8 +98,8 @@ class Pipeline:
 
             # p2, r2, f2 = get_mention_f1(mention_p, mention_g)
 
-            for single_bio_p, single_bio_g in zip(bio_p, bio_g):
-                f1, fusion = get_f1_by_bio_nomask(single_bio_p, single_bio_g)
+            for single_bio_p, single_bio_g, d_l in zip(bio_p, bio_g, doc_len):
+                f1, fusion = get_f1_by_bio_nomask(single_bio_p[:d_l], single_bio_g[:d_l])
                 fusion_matrix.append(fusion)
                 f1s.append(f1)
             losses.append(loss.item())
@@ -178,9 +177,9 @@ class Pipeline:
         self.validLoader = MyDataLoader(self, mode='valid').getdata()
         self.testLoader = MyDataLoader(self, mode='test').getdata()
 
-        word_dict = pkl.load(open(os.path.join(self.data_dir, 'word_dict.pkl'), 'rb'))
+        self.word_dict = pkl.load(open(os.path.join(self.data_dir, 'word_dict.pkl'), 'rb'))
         #embedding_matrix = pkl.load(open(os.path.join(self.data_dir, 'emb.pkl'), 'rb'))
-        self.word_vocab = len(word_dict)
+        self.word_vocab = len(self.word_dict)
         self.model = myLSTM(self, device=self.device).to(self.device)
 
         param_optimizer = list(self.model.named_parameters())

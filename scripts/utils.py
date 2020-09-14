@@ -177,6 +177,24 @@ def get_f1_by_bio_nomask(predict_out, gold_bio, idx=None):
 import os
 import numpy as np
 
+
+def refind_entity(input, predict_output, word_dict):
+    if len(predict_output.shape) > 2:
+        predict_output = predict_output.argmax(-1)
+    bio_dict = {'B':0, 'I':1, 'O':2}
+    bio_dict = {v:k for k, v in bio_dict.items()}
+    word_dict = {v:k for k, v in word_dict.items()}
+    print(input.shape)
+    print(predict_output.shape)
+
+    for i in range(len(input)):
+        temp = []
+        for j in range(len(input[i])):
+            if word_dict[input[i][j].item()] == '[PAD]':
+                continue
+            print(word_dict[input[i][j].item()], bio_dict[predict_output[i][j].item()], end=',')
+        print()
+
 def getPredictCluster(predict_indices, mention_interaction):
     """
     mention_interaction = [
