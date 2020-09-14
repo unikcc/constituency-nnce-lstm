@@ -422,9 +422,8 @@ class myLSTM(nn.Module):
                 new_mention_label.append(mention_label[j, :j + 1])
             new_mention_label = torch.cat(new_mention_label)
             new_mention_interaction = torch.cat(new_mention_interaction, 0)
-            criterion = nn.CrossEntropyLoss()
             tmp_loss = criterion(new_mention_interaction, new_mention_label)
-            losses += tmp_loss
+            #losses += tmp_loss
 
             self.predict_mention = new_mention_interaction.cpu().tolist()
             self.gold_mention = new_mention_label.cpu().tolist()
