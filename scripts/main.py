@@ -90,11 +90,9 @@ class Pipeline:
                 self.model.zero_grad()
             else:
                 with torch.no_grad():
-                    loss, correct_count, count, bio_p, bio_g  = \
-                        self.model(input_ids, input_lengths, input_labels, mention_sets,
-                                   show_res=True,
-                                   coref_evaluator=coref_evaluator)
-                    rate_res.append(self.model.rate)
+                    loss, correct_count, count, bio_p, bio_g = self.model(input_ids, input_lengths, input_labels,
+                                                                          mention_sets, sentence_counts, reverse_sort,
+                                                                          False, coref_evaluator)
             bio_predict.append(bio_p)
             bio_gold.append(bio_g)
             # p1, r1, f1 = get_f1_by_bio_nomask(bio_p, bio_g)
