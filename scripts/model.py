@@ -373,13 +373,9 @@ class myLSTM(nn.Module):
         return input
 
 
-
-
-
-
-
     def forward(self, input_ids, input_lengths, input_labels, mention_sets, sentence_counts, reverse_sort, show_res=False, coref_evaluator=None):
         #mention_sets = [[(p[0][0].item(), p[1][0].item()) for p in k] for k in mention_sets if len(k) > 0]
+        mention_sets = [[k for k in mention_set if len(k) > 0] for mention_set in mention_sets]
 
         input_embedding = self.embedding(input_ids)
         paded = nn.utils.rnn.pack_padded_sequence(input_embedding, input_lengths, batch_first=True)
@@ -402,8 +398,9 @@ class myLSTM(nn.Module):
 
         predict_indices = self.get_mention_indices(predict_output)
         gold_indices = self.get_mention_indices(dense_labels)
-        if len(predict_indices) == 0:
-            predict_indices = gold_indices[:1]
+        for i in range(len(predict_indices)):
+            if len(predict_indices[i]) == 0:
+                predict_indices[i] = gold_indices[i][:1]
         #predict_indices = gold_indices
         criterion = nn.CrossEntropyLoss()
         total_count, correct_counts = [], []

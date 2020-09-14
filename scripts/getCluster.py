@@ -79,5 +79,3 @@ def run(predict_indices, indices_dict, mention_label):
         init = res
     return init
 
-
-print(get_cluster(l, a))
